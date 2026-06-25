@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <utility>
 #include <string>
 #include <vector>
 
@@ -71,5 +72,8 @@ private:
 
 CommandArgs parseCommandArgs(const std::vector<std::string> &tokens);
 std::string commandAliasName(const std::string &name);
+std::vector<std::string> commandArgumentKeys(const CommandParameter &field);
+std::vector<std::pair<std::string, uint8_t>>
+commandValueAliases(const CommandInfo &command, const CommandParameter &field);
 
 } // namespace sanbot

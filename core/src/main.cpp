@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <exception>
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <string>
 #include <thread>
@@ -207,28 +208,161 @@ static bool parseHeadDirection(const string &s, uint8_t &out) {
   return true;
 }
 
+static bool parseOnOff(const string &s, uint8_t &out) {
+  string k = lowerString(s);
+  if (k == "on" || k == "enable" || k == "enabled" || k == "true" ||
+      k == "1")
+    out = 0x01;
+  else if (k == "off" || k == "disable" || k == "disabled" ||
+           k == "false" || k == "0")
+    out = 0x00;
+  else
+    return parseByteValue(s, out);
+  return true;
+}
+
+static bool parseLedTarget(const string &s, uint8_t &out) {
+  string k = lowerString(s);
+  if (k == "all" || k == "broadcast")
+    out = 0x00;
+  else if (k == "wheel")
+    out = 0x01;
+  else if (k == "left-hand" || k == "left-arm" || k == "arm-left")
+    out = 0x02;
+  else if (k == "right-hand" || k == "right-arm" || k == "arm-right")
+    out = 0x03;
+  else if (k == "left-head" || k == "left-ear" || k == "ear-left")
+    out = 0x04;
+  else if (k == "head-left")
+    out = 0x04;
+  else if (k == "right-head" || k == "right-ear" || k == "ear-right")
+    out = 0x05;
+  else if (k == "head-right")
+    out = 0x05;
+  else if (k == "head" || k == "head-all")
+    out = 0x0A;
+  else if (k.rfind("led-", 0) == 0)
+    return parseByteValue(k.substr(4), out);
+  else if (k.rfind("led", 0) == 0 && k.size() > 3)
+    return parseByteValue(k.substr(3), out);
+  else
+    return parseByteValue(s, out);
+  return true;
+}
+
+static bool parseFaceMode(const string &s, uint8_t &out) {
+  string k = lowerString(s);
+  if (k.rfind("face-", 0) == 0)
+    return parseByteValue(k.substr(5), out);
+  if (k.rfind("face", 0) == 0 && k.size() > 4)
+    return parseByteValue(k.substr(4), out);
+  if (k.rfind("expression-", 0) == 0)
+    return parseByteValue(k.substr(11), out);
+  if (k.rfind("expression", 0) == 0 && k.size() > 10)
+    return parseByteValue(k.substr(10), out);
+  return parseByteValue(s, out);
+}
+
+static bool parseLedMode(const string &s, uint8_t &out) {
+  string k = lowerString(s);
+  if (parseOnOff(k, out))
+    return true;
+  if (k == "close" || k == "closed")
+    out = 0x01;
+  else if (k == "white")
+    out = 0x02;
+  else if (k == "red")
+    out = 0x03;
+  else if (k == "green")
+    out = 0x04;
+  else if (k == "pink")
+    out = 0x05;
+  else if (k == "purple")
+    out = 0x06;
+  else if (k == "blue")
+    out = 0x07;
+  else if (k == "yellow")
+    out = 0x08;
+  else if (k == "flicker-white" || k == "blink-white")
+    out = 0x12;
+  else if (k == "flicker-red" || k == "blink-red")
+    out = 0x13;
+  else if (k == "flicker-green" || k == "blink-green")
+    out = 0x14;
+  else if (k == "flicker-pink" || k == "blink-pink")
+    out = 0x15;
+  else if (k == "flicker-purple" || k == "blink-purple")
+    out = 0x16;
+  else if (k == "flicker-blue" || k == "blink-blue")
+    out = 0x17;
+  else if (k == "flicker-yellow" || k == "blink-yellow")
+    out = 0x18;
+  else if (k == "flicker-random" || k == "blink-random")
+    out = 0x19;
+  else if (k == "flicker-random-three-group" ||
+           k == "blink-random-three-group")
+    out = 0x20;
+  else if (k == "head-breathing-end")
+    out = 0x00;
+  else if (k == "head-breathing-start")
+    out = 0x01;
+  else if (k == "head-wakeup")
+    out = 0x04;
+  else if (k == "head-mute-start")
+    out = 0x07;
+  else if (k == "head-video-start")
+    out = 0x03;
+  else if (k == "head-sleep")
+    out = 0x0A;
+  else if (k == "head-video-end")
+    out = 0x14;
+  else if (k == "head-human-control-end")
+    out = 0x1E;
+  else if (k == "head-human-control-start")
+    out = 0x1F;
+  else if (k == "head-animated-breathing")
+    out = 0x18;
+  else
+    return parseByteValue(s, out);
+  return true;
+}
+
 static void printUsage(const char *argv0) {
   fprintf(stderr,
           "Usage:\n"
           "  %s help\n"
           "  %s examples\n"
+          "  %s [--debug] [--test] torch on|off|restore [brightness]\n"
+          "  %s [--debug] [--test] led TARGET on|off|MODE [rate] [random]\n"
+          "  %s [--debug] [--test] face 1..21\n"
+          "  %s [--debug] [--test] projector on|off|query\n"
+          "  %s [--debug] [--test] speaker on|off\n"
           "  %s [--db PATH] [--debug] [--test] commands\n"
+          "  %s [--db PATH] list-all-commands [CATEGORY]\n"
           "  %s [--db PATH] describe-command NAME\n"
           "  %s [--db PATH] [--target head|bottom|both] [--debug] [--test] "
           "send-command NAME key=value...\n"
           "  %s [--test] take-control\n"
           "  %s [--test] listen [seconds]\n"
           "  %s [--debug] [--test] <legacy-command> ...\n",
-          argv0, argv0, argv0, argv0, argv0, argv0, argv0, argv0);
+          argv0, argv0, argv0, argv0, argv0, argv0, argv0, argv0, argv0,
+          argv0, argv0, argv0, argv0, argv0);
 }
 
 static void printExamples(const char *argv0) {
   printf("Quick commands:\n");
   printf("  %s commands\n", argv0);
+  printf("  %s list-all-commands\n", argv0);
+  printf("  %s list-all-commands PeripheralControl\n", argv0);
   printf("  %s describe-command wheel\n", argv0);
   printf("  %s --test --debug send-command wheel mode=distance "
          "direction=forward speed=50 distance=1000\n",
          argv0);
+  printf("  %s torch restore 5\n", argv0);
+  printf("  %s led head on\n", argv0);
+  printf("  %s face 1\n", argv0);
+  printf("  %s projector on\n", argv0);
+  printf("  %s speaker on\n", argv0);
   printf("  %s take-control\n", argv0);
   printf("  %s listen\n", argv0);
   printf("\n");
@@ -238,6 +372,8 @@ static void printExamples(const char *argv0) {
          "mcu-command-database/sanbot_mcu_commands.sqlite.\n");
   printf("  Use commands to list names and describe-command NAME to see "
          "accepted fields.\n");
+  printf("  Use list-all-commands to list categories, then pass a category "
+         "to see descriptions.\n");
   printf("  Override the database with --db PATH or SANBOT_MCU_COMMAND_DB.\n");
   printf("\n");
 
@@ -260,15 +396,38 @@ static void printExamples(const char *argv0) {
   printf("\n");
 
   printf("Light examples:\n");
+  printf("  %s torch on\n", argv0);
+  printf("  %s torch off\n", argv0);
+  printf("  %s torch restore 5\n", argv0);
+  printf("  %s led all on\n", argv0);
+  printf("  %s led left-arm blue\n", argv0);
+  printf("  %s led right-ear flicker-purple 2 0\n", argv0);
+  printf("  %s led head 0x18 2 0\n", argv0);
   printf("  %s send-command LEDLightCommand whichLight=1 switchMode=on "
          "led_rate=5 led_random_number=0\n",
          argv0);
   printf("  %s send-command WhiteLightCommand switchMode=on\n", argv0);
-  printf("  %s send-command SetWhiteBrightness setWhiteBrightness=1 "
-         "brightness=80\n",
+  printf("  %s send-command SetWhiteBrightness setWhiteBrightness=restore "
+         "brightness=5\n",
          argv0);
-  printf("  %s send-command QueryWhiteBrightness queryWhiteBrightness=1\n",
+  printf("  %s send-command SetWhiteBrightness brightness=5\n", argv0);
+  printf("  %s send-command QueryWhiteBrightness\n", argv0);
+  printf("\n");
+
+  printf("Face examples:\n");
+  printf("  %s face 1\n", argv0);
+  printf("  %s send-command LiliNormalExpression expression_type=face-1\n",
          argv0);
+  printf("\n");
+
+  printf("Projector and speaker examples:\n");
+  printf("  %s projector on\n", argv0);
+  printf("  %s projector off\n", argv0);
+  printf("  %s projector query\n", argv0);
+  printf("  %s speaker on\n", argv0);
+  printf("  %s speaker off\n", argv0);
+  printf("  %s send-command ProjectorCommand switchMode=on\n", argv0);
+  printf("  %s send-command SpeakerCommand switchMode=on\n", argv0);
   printf("\n");
 
   printf("Battery examples:\n");
@@ -302,6 +461,41 @@ static void printCommandList(const sanbot::CommandDatabase &db) {
   }
 }
 
+static void printCommandCategories(const sanbot::CommandDatabase &db) {
+  map<string, size_t> counts;
+  for (const auto &command : db.commands())
+    counts[command.commandGroup]++;
+
+  printf("Command categories:\n");
+  for (const auto &[group, count] : counts)
+    printf("  %-24s %zu commands\n", group.c_str(), count);
+  printf("\nUse list-all-commands CATEGORY to see commands in a category.\n");
+}
+
+static void printCommandsInCategory(const sanbot::CommandDatabase &db,
+                                    const string &category) {
+  string wanted = lowerString(category);
+  bool found = false;
+  for (const auto &command : db.commands()) {
+    if (lowerString(command.commandGroup) != wanted)
+      continue;
+    found = true;
+    printf("%-30s %s\n", command.canonicalName.c_str(),
+           command.description.c_str());
+    if (!command.aliases.empty()) {
+      printf("  aliases:");
+      for (const auto &alias : command.aliases)
+        printf(" %s", alias.c_str());
+      printf("\n");
+    }
+  }
+
+  if (!found) {
+    fprintf(stderr, "smb: unknown command category: %s\n", category.c_str());
+    printCommandCategories(db);
+  }
+}
+
 static void printCommandDescription(const sanbot::CommandInfo &command) {
   printf("%s\n", command.canonicalName.c_str());
   printf("  group: %s\n", command.commandGroup.c_str());
@@ -328,6 +522,23 @@ static void printCommandDescription(const sanbot::CommandInfo &command) {
     if (!parameter.conditionExpr.empty())
       printf(" when %s", parameter.conditionExpr.c_str());
     printf("\n");
+
+    auto keys = parameter.valueHex.empty() ? sanbot::commandArgumentKeys(parameter)
+                                           : vector<string>{};
+    if (!keys.empty()) {
+      printf("      args:");
+      for (const auto &key : keys)
+        printf(" %s", key.c_str());
+      printf("\n");
+    }
+
+    auto values = sanbot::commandValueAliases(command, parameter);
+    if (!values.empty()) {
+      printf("      values:");
+      for (const auto &[name, byte] : values)
+        printf(" %s=0x%02X", name.c_str(), byte);
+      printf("\n");
+    }
   }
 }
 
@@ -454,6 +665,165 @@ int main(int argc, char **argv) {
     return true;
   };
 
+  if (cmd == "torch" || cmd == "white-light") {
+    if (argc - argi < 2 || argc - argi > 3) {
+      printUsage(argv[0]);
+      return 1;
+    }
+
+    string action = lowerString(argv[argi + 1]);
+    uint8_t brightness = 0x05;
+    if (argc - argi == 3 && !parseByteValue(argv[argi + 2], brightness))
+      return 1;
+
+    auto db = open_database();
+    try {
+      if (action == "off") {
+        return send_built_command(db.buildCommand(
+                   "WhiteLightCommand", {{"switch", "off"}}))
+                   ? 0
+                   : 1;
+      }
+      if (action == "on") {
+        if (!send_built_command(
+                db.buildCommand("WhiteLightCommand", {{"switch", "on"}})))
+          return 1;
+        return send_built_command(db.buildCommand(
+                   "SetWhiteBrightness",
+                   {{"setWhiteBrightness", "restore"},
+                    {"brightness", to_string(static_cast<int>(brightness))}}))
+                   ? 0
+                   : 1;
+      }
+      if (action == "restore" || action == "brightness") {
+        return send_built_command(db.buildCommand(
+                   "SetWhiteBrightness",
+                   {{"setWhiteBrightness", "restore"},
+                    {"brightness", to_string(static_cast<int>(brightness))}}))
+                   ? 0
+                   : 1;
+      }
+    } catch (const exception &ex) {
+      fprintf(stderr, "smb: %s\n", ex.what());
+      return 1;
+    }
+
+    printUsage(argv[0]);
+    return 1;
+  }
+
+  if (cmd == "led") {
+    if (argc - argi < 3 || argc - argi > 5) {
+      printUsage(argv[0]);
+      return 1;
+    }
+
+    uint8_t target;
+    if (!parseLedTarget(argv[argi + 1], target))
+      return 1;
+
+    uint8_t mode;
+    if (!parseLedMode(argv[argi + 2], mode))
+      return 1;
+
+    uint8_t rate = 0x00;
+    uint8_t random = 0x00;
+    if (argc - argi >= 4 && !parseByteValue(argv[argi + 3], rate))
+      return 1;
+    if (argc - argi == 5 && !parseByteValue(argv[argi + 4], random))
+      return 1;
+
+    try {
+      auto db = open_database();
+      return send_built_command(db.buildCommand(
+                 "LEDLightCommand",
+                 {{"whichLight", to_string(static_cast<int>(target))},
+                  {"switchMode", to_string(static_cast<int>(mode))},
+                  {"led_rate", to_string(static_cast<int>(rate))},
+                  {"led_random_number", to_string(static_cast<int>(random))}}))
+                 ? 0
+                 : 1;
+    } catch (const exception &ex) {
+      fprintf(stderr, "smb: %s\n", ex.what());
+      return 1;
+    }
+  }
+
+  if (cmd == "face" || cmd == "expression") {
+    if (argc - argi != 2) {
+      printUsage(argv[0]);
+      return 1;
+    }
+
+    uint8_t expression;
+    if (!parseFaceMode(argv[argi + 1], expression) || expression < 1 ||
+        expression > 21)
+      return 1;
+
+    try {
+      auto db = open_database();
+      return send_built_command(db.buildCommand(
+                 "LiliNormalExpression",
+                 {{"expression_type", to_string(static_cast<int>(expression))}}))
+                 ? 0
+                 : 1;
+    } catch (const exception &ex) {
+      fprintf(stderr, "smb: %s\n", ex.what());
+      return 1;
+    }
+  }
+
+  if (cmd == "projector") {
+    if (argc - argi != 2) {
+      printUsage(argv[0]);
+      return 1;
+    }
+
+    string action = lowerString(argv[argi + 1]);
+    try {
+      auto db = open_database();
+      if (action == "query" || action == "status") {
+        return send_built_command(db.buildCommand("QueryProjectorSwitch", {}))
+                   ? 0
+                   : 1;
+      }
+      uint8_t switchMode;
+      if (!parseOnOff(action, switchMode))
+        return 1;
+      return send_built_command(db.buildCommand(
+                 "ProjectorCommand",
+                 {{"switchMode", to_string(static_cast<int>(switchMode))}}))
+                 ? 0
+                 : 1;
+    } catch (const exception &ex) {
+      fprintf(stderr, "smb: %s\n", ex.what());
+      return 1;
+    }
+  }
+
+  if (cmd == "speaker") {
+    if (argc - argi != 2) {
+      printUsage(argv[0]);
+      return 1;
+    }
+
+    uint8_t switchMode;
+    if (!parseOnOff(argv[argi + 1], switchMode))
+      return 1;
+
+    try {
+      auto db = open_database();
+      return send_built_command(db.buildCommand(
+                 "SpeakerCommand",
+                 {{"switchMode", to_string(static_cast<int>(switchMode))}}))
+                 ? 0
+                 : 1;
+    } catch (const exception &ex) {
+      fprintf(stderr, "smb: %s\n", ex.what());
+      return 1;
+    }
+  }
+
   if (cmd == "take-control" || cmd == "claim-usb") {
     if (argc - argi != 1) {
       printUsage(argv[0]);
@@ -465,7 +835,7 @@ int main(int argc, char **argv) {
     }
     SanbotUsbManager *usb = ensure_manager();
     if (!usb->takeControl()) {
-      fprintf(stderr, "sanbot-mcu-bridge: no Sanbot USB endpoints claimed\n");
+      fprintf(stderr, "smb: no Sanbot USB endpoints claimed\n");
       return 1;
     }
     printf("Claimed Sanbot USB endpoints\n");
@@ -498,7 +868,7 @@ int main(int argc, char **argv) {
     SanbotUsbManager *usb = ensure_manager();
     usb->setListener(log_received);
     if (!usb->takeControl()) {
-      fprintf(stderr, "sanbot-mcu-bridge: no Sanbot USB endpoints claimed\n");
+      fprintf(stderr, "smb: no Sanbot USB endpoints claimed\n");
       return 1;
     }
     usb->startListener();
@@ -528,6 +898,20 @@ int main(int argc, char **argv) {
       return 0;
     }
 
+    if (cmd == "list-all-commands" || cmd == "categories" ||
+        cmd == "command-categories") {
+      if (argc - argi > 2) {
+        printUsage(argv[0]);
+        return 1;
+      }
+      auto db = open_database();
+      if (argc - argi == 1)
+        printCommandCategories(db);
+      else
+        printCommandsInCategory(db, argv[argi + 1]);
+      return 0;
+    }
+
     if (cmd == "describe-command" || cmd == "describe" ||
         cmd == "db-describe") {
       if (argc - argi != 2) {
@@ -553,7 +937,7 @@ int main(int argc, char **argv) {
       return send_built_command(built) ? 0 : 1;
     }
   } catch (const exception &ex) {
-    fprintf(stderr, "sanbot-mcu-bridge: %s\n", ex.what());
+    fprintf(stderr, "smb: %s\n", ex.what());
     return 1;
   }
 
@@ -776,7 +1160,7 @@ int main(int argc, char **argv) {
     auto built = db.buildCommand(argv[argi], sanbot::parseCommandArgs(tokens));
     return send_built_command(built) ? 0 : 1;
   } catch (const exception &ex) {
-    fprintf(stderr, "sanbot-mcu-bridge: %s\n", ex.what());
+    fprintf(stderr, "smb: %s\n", ex.what());
   }
 
   return 1;

@@ -4,119 +4,127 @@ A C++ library and CLI to control the Sanbot Elf S1-B2 humanoid robot over USB, b
 
 ## Quick start
 
-Build the CLI, list the database-backed commands, inspect a command, and dry-run
-a packet before sending it to hardware:
+First, install the CLI. Then, you can list, describe, and test.
 
 ```sh
 cd core
 ./install-cli.sh
-./sanbot-mcu-bridge commands
-./sanbot-mcu-bridge describe-command wheel
-./sanbot-mcu-bridge --test --debug send-command wheel mode=distance direction=forward speed=50 distance=1000
+./smb commands
+./smb list-all-commands
+./smb list-all-commands PeripheralControl
+./smb describe-command wheel
+./smb --test --debug send-command wheel mode=distance direction=forward speed=50 distance=1000
 ```
 
 Commands come from `mcu-command-database/sanbot_mcu_commands.sqlite`. Use
 `commands` to list them and `describe-command NAME` to see the accepted fields.
-You can point at another copy with `--db /path/to/sanbot_mcu_commands.sqlite`
-or `SANBOT_MCU_COMMAND_DB=/path/to/sanbot_mcu_commands.sqlite`.
+Use `list-all-commands` to list categories, then pass a category name to see
+each command and its description.
 
-Start USB control and the packet listener like this:
+To start sending commands, you must take control of the USB:
 
 ```sh
-./sanbot-mcu-bridge take-control
-./sanbot-mcu-bridge listen
-./sanbot-mcu-bridge listen 30
+./smb take-control
 ```
 
-`listen` runs until Ctrl-C, unless you pass a timeout in seconds. The current
-`main` build is CLI-only and does not include a Qt GUI target; use the CLI
-commands below or check out the old GUI branch if you specifically need the
-removed GUI prototype.
+To listen for incoming packets, you can start the listener:
+
+```sh
+./smb listen
+./smb listen 30
+```
+
+It runs until terminated, unless you pass a timeout.
 
 ### Command examples
 
 Locomotion:
 
 ```sh
-./sanbot-mcu-bridge send-command wheel mode=distance direction=forward speed=50 distance=1000
-./sanbot-mcu-bridge send-command wheel mode=relative direction=left speed=40 angle=90
-./sanbot-mcu-bridge send-command wheel mode=timed direction=turn-left time=1000 degree=90
-./sanbot-mcu-bridge send-command wheel mode=no-angle direction=right-translation speed=40 time=1000 isCircle=0
-./sanbot-mcu-bridge send-command wheel mode=no-angle direction=stop speed=0 time=0 isCircle=0
+./smb send-command wheel mode=distance direction=forward speed=50 distance=1000
+./smb send-command wheel mode=relative direction=left speed=40 angle=90
+./smb send-command wheel mode=timed direction=turn-left time=1000 degree=90
+./smb send-command wheel mode=no-angle direction=right-translation speed=40 time=1000 isCircle=0
+./smb send-command wheel mode=no-angle direction=stop speed=0 time=0 isCircle=0
 ```
 
 Lights:
 
 ```sh
-./sanbot-mcu-bridge send-command LEDLightCommand whichLight=1 switchMode=on led_rate=5 led_random_number=0
-./sanbot-mcu-bridge send-command WhiteLightCommand switchMode=on
-./sanbot-mcu-bridge send-command SetWhiteBrightness setWhiteBrightness=1 brightness=80
-./sanbot-mcu-bridge send-command QueryWhiteBrightness queryWhiteBrightness=1
+./smb torch on
+./smb torch off
+./smb torch restore 5
+./smb led all on
+./smb led left-arm blue
+./smb led right-arm flicker-red 2 0
+./smb led left-ear purple
+./smb led head 0x18 2 0
+./smb send-command LEDLightCommand whichLight=1 switchMode=on led_rate=5 led_random_number=0
+./smb send-command LEDLightCommand whichLight=left-hand switchMode=blue led_rate=0 led_random_number=0
+./smb send-command WhiteLightCommand switchMode=on
+./smb send-command SetWhiteBrightness setWhiteBrightness=restore brightness=5
+./smb send-command SetWhiteBrightness brightness=5
+./smb send-command QueryWhiteBrightness
 ```
 
+See `docs/Lights-And-Face-Modes.md` for notes on how to use the original torch toggle (WhiteLightCommand).
+
+Face modes:
+
+```sh
+./smb face 1
+./smb face 20
+./smb send-command LiliNormalExpression expression_type=face-1
+```
+
+Projector and speaker:
+
+```sh
+./smb projector on
+./smb projector off
+./smb projector query
+./smb speaker on
+./smb speaker off
+./smb send-command ProjectorCommand switchMode=on
+./smb send-command SpeakerCommand switchMode=on
+```
+
+See `docs/Projector-Audio-And-Motions.md` for projector notes.
 Battery:
 
 ```sh
-./sanbot-mcu-bridge send-command QueryBatteryCommand battery=0 currentBattery=0
-./sanbot-mcu-bridge send-command BatteryTemperatureCommand temperature=0
-./sanbot-mcu-bridge send-command AutoBatteryCommand switchMode=on threshold=20
-./sanbot-mcu-bridge send-command AutoBatteryCommand switchMode=off
+./smb send-command QueryBatteryCommand battery=0 currentBattery=0
+./smb send-command BatteryTemperatureCommand temperature=0
+./smb send-command AutoBatteryCommand switchMode=on threshold=20
+./smb send-command AutoBatteryCommand switchMode=off
 ```
 
 The same examples are available from the binary:
 
 ```sh
-./sanbot-mcu-bridge help
-./sanbot-mcu-bridge examples
+./smb help
+./smb examples
 ```
 
 ## The project
 
 **This project is currently in development - it's not ready yet!**
 
-This project aims to create a comprehensive and easy-to-use CLI and library to control the Sanbot Elf S1-B2 from (almost) any device, fully bypassing the original Android board. This will be used in a project of mine called Sunny-Sanbot, which you can find on my GitHub profile.
+It aims to create a comprehensive and easy-to-use CLI and library to control the Sanbot Elf S1-B2 from (almost) any device, fully bypassing the original Android board. This will be used in a project of mine called Sunny-Sanbot, which you can find on my GitHub profile.
 
 ## Roadmap
 
 - [x] Working packet send/receive to MCUs
 - [x] Database-backed command catalogue exposed to the CLI/library
-- [ ] Hardware-test every database-backed command
+- [ ] Hardware-test most database-backed commands
 - [ ] Audio & Camera bridge
 - [ ] C++ library
-
-## Database-backed commands
-
-The C++ core can now load `mcu-command-database/sanbot_mcu_commands.sqlite`
-and build packets from the normalized command tables instead of requiring a
-new C++ function for every command.
-
-```sh
-sanbot-mcu-bridge commands
-sanbot-mcu-bridge describe-command wheel
-sanbot-mcu-bridge --test --debug send-command wheel mode=distance direction=forward speed=50 distance=1000
-```
-
-Use `--db /path/to/sanbot_mcu_commands.sqlite` or
-`SANBOT_MCU_COMMAND_DB=/path/to/sanbot_mcu_commands.sqlite` if the default
-database discovery cannot find the repo-local database.
-
-## CLI install
-
-`core/install.sh` and `core/install-cli.sh` build only the CLI and smoke-test
-binary. They auto-install the required package-manager dependencies where
-possible: `pkg-config`, SQLite3 development headers, and `libusb-1.0`
-development headers.
-
-```sh
-cd core
-./install-cli.sh
-./sanbot-mcu-bridge take-control
-./sanbot-mcu-bridge listen
-```
 
 ## Notes from the dev
 
 The sources for algorithms, addresses and commands are private, since I can't publish them as they're not open source (I pulled it from the firmware such that it's legal for me to reference where necessary but not use or share).
+
+Some number of docs were partially or fully written by ChatGPT Codex. In the majority of cases, I wrote vague notes on what I did, and it compiled it into something that other people could read.
 
 This library had a Python predecessor. For more info, see docs/History.md.
 

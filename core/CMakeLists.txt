@@ -6,9 +6,9 @@ find_package(SQLite3)
 find_package(PkgConfig)
 if(APPLE)
   # The CLI depends on libusb; default off on macOS but keep explicit opt-in working.
-  option(SANBOT_BUILD_CLI "Build the sanbot-mcu-bridge CLI" OFF)
+  option(SANBOT_BUILD_CLI "Build the smb CLI" OFF)
 else()
-  option(SANBOT_BUILD_CLI "Build the sanbot-mcu-bridge CLI" ON)
+  option(SANBOT_BUILD_CLI "Build the smb CLI" ON)
 endif()
 option(SANBOT_BUILD_COMMAND_DB_SMOKE "Build the database command smoke test" ON)
 
@@ -33,14 +33,14 @@ if(SANBOT_BUILD_CLI)
   endif()
 
   if(TARGET PkgConfig::LIBUSB AND TARGET sanbot-mcu-core)
-    add_executable(sanbot-mcu-bridge
+    add_executable(smb
       src/main.cpp
       src/usb-send.cpp
     )
 
-    target_link_libraries(sanbot-mcu-bridge sanbot-mcu-core PkgConfig::LIBUSB)
+    target_link_libraries(smb sanbot-mcu-core PkgConfig::LIBUSB)
   else()
-    message(WARNING "libusb-1.0 or sanbot-mcu-core not found; skipping sanbot-mcu-bridge (CLI). Install libusb-1.0 and SQLite3 to enable it.")
+    message(WARNING "libusb-1.0 or sanbot-mcu-core not found; skipping smb (CLI). Install libusb-1.0 and SQLite3 to enable it.")
   endif()
 endif()
 

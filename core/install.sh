@@ -128,8 +128,9 @@ build() {
 
   "$CXX" -std=c++20 \
     src/main.cpp src/control-catalogue.cpp src/command-database.cpp src/packet-assembler.cpp src/usb-send.cpp \
-    -o sanbot-mcu-bridge \
+    -o smb \
     $(pkg-config --cflags --libs sqlite3 libusb-1.0)
+  ln -sf smb sanbot-mcu-bridge
 
   "$CXX" -std=c++20 \
     src/command-database-smoke.cpp src/control-catalogue.cpp src/command-database.cpp src/packet-assembler.cpp \

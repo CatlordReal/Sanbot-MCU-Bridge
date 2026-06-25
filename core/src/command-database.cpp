@@ -244,8 +244,30 @@ std::vector<std::string> baseKeysForHalfField(const std::string &fieldName) {
   if (base.find("Degree") != std::string::npos) {
     addUnique(keys, replaceFirst(base, "Degree", "Angle"));
     addUnique(keys, replaceFirst(simple, "Degree", "Angle"));
-    addUnique(keys, "degree");
-    addUnique(keys, "angle");
+    if (base.rfind("horizontal", 0) == 0) {
+      addUnique(keys, "horizontal");
+      addUnique(keys, "horizontalDegree");
+      addUnique(keys, "horizontal-degree");
+      addUnique(keys, "horizontalAngle");
+      addUnique(keys, "horizontal-angle");
+      addUnique(keys, "hDegree");
+      addUnique(keys, "h-degree");
+      addUnique(keys, "hAngle");
+      addUnique(keys, "h-angle");
+    } else if (base.rfind("vertical", 0) == 0) {
+      addUnique(keys, "vertical");
+      addUnique(keys, "verticalDegree");
+      addUnique(keys, "vertical-degree");
+      addUnique(keys, "verticalAngle");
+      addUnique(keys, "vertical-angle");
+      addUnique(keys, "vDegree");
+      addUnique(keys, "v-degree");
+      addUnique(keys, "vAngle");
+      addUnique(keys, "v-angle");
+    } else {
+      addUnique(keys, "degree");
+      addUnique(keys, "angle");
+    }
   }
   if (base.find("Time") != std::string::npos) {
     addUnique(keys, "time");
@@ -265,6 +287,13 @@ std::vector<std::string> argumentKeysForField(const CommandParameter &field) {
   if (isSimpleIdentifier(field.valueExpr) && field.valueExpr != "constant") {
     addUnique(keys, field.valueExpr);
     addUnique(keys, commandAliasName(field.valueExpr));
+  }
+  if (field.valueExpr.find("whichLight") != std::string::npos) {
+    addUnique(keys, "whichLight");
+    addUnique(keys, "which-light");
+    addUnique(keys, "light");
+    addUnique(keys, "target");
+    addUnique(keys, "part");
   }
 
   std::string simple = stripMotionPrefix(field.fieldName);
@@ -288,8 +317,11 @@ std::vector<std::string> argumentKeysForField(const CommandParameter &field) {
   if (lower == "moveheaddirection")
     addUnique(keys, "lock");
   if (lower.find("degree") != std::string::npos) {
-    addUnique(keys, "degree");
-    addUnique(keys, "angle");
+    if (lower.rfind("horizontal", 0) != 0 &&
+        lower.rfind("vertical", 0) != 0) {
+      addUnique(keys, "degree");
+      addUnique(keys, "angle");
+    }
   }
   if (lower.find("distance") != std::string::npos)
     addUnique(keys, "distance");
@@ -305,14 +337,17 @@ std::vector<std::string> argumentKeysForField(const CommandParameter &field) {
   return keys;
 }
 
-std::optional<uint8_t> valueAlias(const std::string &fieldName,
-                                  const std::string &rawValue) {
+std::vector<std::pair<std::string, uint8_t>>
+valueAliasesForField(const CommandInfo *command,
+                     const std::string &fieldName) {
   std::string field = normalizeKey(fieldName);
-  std::string value = normalizeKey(rawValue);
-  std::map<std::string, uint8_t> aliases;
+  std::string commandName = command ? normalizeKey(command->canonicalName) : "";
+  std::vector<std::pair<std::string, uint8_t>> aliases;
+  std::set<std::string> seen;
 
   auto add = [&](const std::string &name, uint8_t byte) {
-    aliases[normalizeKey(name)] = byte;
+    if (seen.insert(normalizeKey(name)).second)
+      aliases.emplace_back(name, byte);
   };
 
   if (field.find("switch") != std::string::npos ||
@@ -325,6 +360,103 @@ std::optional<uint8_t> valueAlias(const std::string &fieldName,
     add("enable", 0x01);
     add("enabled", 0x01);
     add("true", 0x01);
+  }
+
+  if (field.find("whichlight") != std::string::npos) {
+    add("all", 0x00);
+    add("broadcast", 0x00);
+    add("wheel", 0x01);
+    add("led-1", 0x01);
+    add("led1", 0x01);
+    add("left-hand", 0x02);
+    add("left-arm", 0x02);
+    add("arm-left", 0x02);
+    add("led-2", 0x02);
+    add("led2", 0x02);
+    add("right-hand", 0x03);
+    add("right-arm", 0x03);
+    add("arm-right", 0x03);
+    add("led-3", 0x03);
+    add("led3", 0x03);
+    add("left-head", 0x04);
+    add("left-ear", 0x04);
+    add("ear-left", 0x04);
+    add("led-4", 0x04);
+    add("led4", 0x04);
+    add("head-left", 0x04);
+    add("right-head", 0x05);
+    add("right-ear", 0x05);
+    add("ear-right", 0x05);
+    add("led-5", 0x05);
+    add("led5", 0x05);
+    add("head-right", 0x05);
+    add("led-10", 0x0A);
+    add("led10", 0x0A);
+    add("head", 0x0A);
+    add("head-all", 0x0A);
+  }
+
+  if (commandName == "ledlightcommand" &&
+      (field == "switchmode" || field.find("mode") != std::string::npos)) {
+    add("close", 0x01);
+    add("closed", 0x01);
+    add("white", 0x02);
+    add("red", 0x03);
+    add("green", 0x04);
+    add("pink", 0x05);
+    add("purple", 0x06);
+    add("blue", 0x07);
+    add("yellow", 0x08);
+    add("flicker-white", 0x12);
+    add("blink-white", 0x12);
+    add("flicker-red", 0x13);
+    add("blink-red", 0x13);
+    add("flicker-green", 0x14);
+    add("blink-green", 0x14);
+    add("flicker-pink", 0x15);
+    add("blink-pink", 0x15);
+    add("flicker-purple", 0x16);
+    add("blink-purple", 0x16);
+    add("flicker-blue", 0x17);
+    add("blink-blue", 0x17);
+    add("flicker-yellow", 0x18);
+    add("blink-yellow", 0x18);
+    add("flicker-random", 0x19);
+    add("blink-random", 0x19);
+    add("flicker-random-three-group", 0x20);
+    add("blink-random-three-group", 0x20);
+    add("head-breathing-end", 0x00);
+    add("head-breathing-start", 0x01);
+    add("head-wakeup", 0x04);
+    add("head-mute-start", 0x07);
+    add("head-video-start", 0x03);
+    add("head-sleep", 0x0A);
+    add("head-video-end", 0x14);
+    add("head-human-control-end", 0x1E);
+    add("head-human-control-start", 0x1F);
+    add("head-animated-breathing", 0x18);
+  }
+
+  if (field == "setwhitebrightness") {
+    add("off", 0x00);
+    add("on", 0x01);
+    add("restore", 0x02);
+    add("set", 0x02);
+    add("brightness", 0x02);
+  }
+
+  if (field == "querywhitebrightness") {
+    add("query", 0x03);
+    add("brightness", 0x03);
+  }
+
+  if (field == "expressiontype" || field == "expression_type") {
+    for (uint8_t value = 1; value <= 21; ++value) {
+      add("face-" + std::to_string(value), value);
+      add("face" + std::to_string(value), value);
+      add("expression-" + std::to_string(value), value);
+      add("expression" + std::to_string(value), value);
+    }
   }
 
   if (field == "movewheeldirection") {
@@ -388,7 +520,7 @@ std::optional<uint8_t> valueAlias(const std::string &fieldName,
     add("down", 0x02);
   }
 
-  if (field.find("mode") != std::string::npos) {
+  if (field == "movewheelmode") {
     add("no-angle", 0x01);
     add("direct", 0x01);
     add("relative", 0x02);
@@ -396,16 +528,59 @@ std::optional<uint8_t> valueAlias(const std::string &fieldName,
     add("timed", 0x10);
     add("time", 0x10);
     add("distance", 0x11);
+  }
+
+  if (field == "movehandmode") {
+    add("no-angle", 0x01);
+    add("direct", 0x01);
+    add("relative", 0x02);
+    add("absolute", 0x03);
+    add("timed", 0x10);
+    add("time", 0x10);
+  }
+
+  if (field == "moveheadmode") {
+    add("no-angle", 0x01);
+    add("direct", 0x01);
+    add("relative", 0x02);
+    add("absolute", 0x03);
+    add("timed", 0x10);
+    add("time", 0x10);
     add("centre", 0x20);
     add("center", 0x20);
     add("locate-absolute", 0x21);
     add("locate-relative", 0x22);
   }
 
+  return aliases;
+}
+
+std::optional<uint8_t> valueAlias(const CommandInfo *command,
+                                  const std::string &fieldName,
+                                  const std::string &rawValue) {
+  std::string value = normalizeKey(rawValue);
+  std::map<std::string, uint8_t> aliases;
+  for (const auto &[name, byte] : valueAliasesForField(command, fieldName))
+    aliases[normalizeKey(name)] = byte;
+
   auto it = aliases.find(value);
   if (it == aliases.end())
     return std::nullopt;
   return it->second;
+}
+
+std::optional<uint8_t> defaultByteForField(const CommandInfo &command,
+                                           const CommandParameter &field) {
+  std::string commandName = normalizeKey(command.canonicalName);
+  std::string fieldName = normalizeKey(field.fieldName);
+
+  if (commandName == "setwhitebrightness" &&
+      fieldName == "setwhitebrightness")
+    return 0x02;
+  if (commandName == "querywhitebrightness" &&
+      fieldName == "querywhitebrightness")
+    return 0x03;
+  return std::nullopt;
 }
 
 struct BuildContext {
@@ -447,15 +622,23 @@ std::optional<uint8_t> lookupNamedByte(const CommandInfo &command,
     for (const auto &key : argumentKeysForField(**field))
       addUnique(keys, key);
   }
+  for (const auto &field : command.parameters) {
+    if (field.valueExpr.find(name) != std::string::npos) {
+      for (const auto &key : argumentKeysForField(field))
+        addUnique(keys, key);
+    }
+  }
 
   auto raw = bag.find(keys);
   if (!raw)
     return std::nullopt;
 
   if (auto field = findFieldByName(command, name)) {
-    if (auto alias = valueAlias((**field).fieldName, *raw))
+    if (auto alias = valueAlias(&command, (**field).fieldName, *raw))
       return *alias;
   }
+  if (auto alias = valueAlias(&command, name, *raw))
+    return *alias;
 
   return parseByteLiteral(*raw);
 }
@@ -516,7 +699,7 @@ uint8_t evalTermByte(const std::string &term, const CommandInfo &command,
     return *named;
 
   if (auto raw = bag.find(argumentKeysForField(field))) {
-    if (auto alias = valueAlias(field.fieldName, *raw))
+    if (auto alias = valueAlias(&command, field.fieldName, *raw))
       return *alias;
     return parseByteLiteral(*raw);
   }
@@ -573,12 +756,14 @@ resolveFieldBytes(const CommandInfo &command, const CommandParameter &field,
 
   auto raw = bag.find(argumentKeysForField(field));
   if (!raw) {
+    if (auto defaultValue = defaultByteForField(command, field))
+      return std::vector<uint8_t>{*defaultValue};
     if (required)
       throw std::runtime_error("missing argument: " + field.fieldName);
     return std::nullopt;
   }
 
-  if (auto alias = valueAlias(field.fieldName, *raw))
+  if (auto alias = valueAlias(&command, field.fieldName, *raw))
     return std::vector<uint8_t>{*alias};
 
   return std::vector<uint8_t>{parseByteLiteral(*raw)};
@@ -677,6 +862,18 @@ std::string CommandDatabase::findDefaultDatabasePath(
   throw std::runtime_error(
       "could not find mcu-command-database/sanbot_mcu_commands.sqlite; set "
       "SANBOT_MCU_COMMAND_DB or pass --db");
+}
+
+std::vector<std::string> commandArgumentKeys(const CommandParameter &field) {
+  auto keys = argumentKeysForField(field);
+  for (const auto &key : baseKeysForHalfField(field.fieldName))
+    addUnique(keys, key);
+  return keys;
+}
+
+std::vector<std::pair<std::string, uint8_t>>
+commandValueAliases(const CommandInfo &command, const CommandParameter &field) {
+  return valueAliasesForField(&command, field.fieldName);
 }
 
 void CommandDatabase::load() {
